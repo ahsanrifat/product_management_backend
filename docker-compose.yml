@@ -1,0 +1,75 @@
+# docker-compose.yml
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:15 # Using a lightweight PostgreSQL image
+    container_name: ecommerce_db
+    environment:
+      POSTGRES_DB: ecommerce # Database name
+      POSTGRES_USER: user     # Database user
+      POSTGRES_PASSWORD: password # Database password
+    ports:
+      - "5432:5432" # Map container port 5432 to host port 5432
+    volumes:
+      - db_data:/var/lib/postgresql/data # Persist database data
+    healthcheck: # Health check to ensure DB is ready before app starts
+      test: ["CMD-SHELL", "pg_isready -U user -d ecommerce"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Application Service
+  web:
+    build: . # Build from the current directory (where Dockerfile is)
+    container_name: ecommerce_fastapi
+    ports:
+      - "8000:8000" # Map container port 8000 to host port 8000
+    environment:
+      DATABASE_URL: postgresql://user:password@db/ecommerce # DB URL for FastAPI
+      # You can add JWT_SECRET_KEY here for production
+      # JWT_SECRET_KEY: "your-super-secret-key"
+    depends_on:
+      db:
+        condition: service_healthy # Ensure DB is healthy before starting web
+    volumes:
+      - ./app:/app/app # Mount local app directory for live changes (dev)
+      - ./requirements.txt:/app/requirements.txt # Ensure requirements is available
+    # For production, remove the volume mount for app and just use the build step
+    # and ensure SECRET_KEY is passed as an environment variable.
+
+  # Prometheus Monitoring Service
+  prometheus:
+    image: prom/prometheus:v2.47.0 # Use a specific Prometheus version
+    container_name: ecommerce_prometheus
+    ports:
+      - "9090:9090" # Map Prometheus UI port
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml # Mount Prometheus config
+    command: --config.file=/etc/prometheus/prometheus.yml # Specify config file
+    depends_on:
+      - web # Prometheus needs the web service to scrape metrics
+
+  # Grafana Visualization Service
+  grafana:
+    image: grafana/grafana:10.2.3 # Use a specific Grafana version
+    container_name: ecommerce_grafana
+    ports:
+      - "3000:3000" # Map Grafana UI port
+    volumes:
+      - grafana_data:/var/lib/grafana # Persist Grafana data
+      - ./grafana/provisioning/:/etc/grafana/provisioning/ # Mount provisioning files
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards # Mount dashboard JSON
+    environment:
+      GF_SECURITY_ADMIN_USER: admin # Grafana admin user
+      GF_SECURITY_ADMIN_PASSWORD: admin # Grafana admin password
+    depends_on:
+      - prometheus # Grafana needs Prometheus as a data source
+
+# Docker Volumes for data persistence
+volumes:
+  db_data: # For PostgreSQL data
+  grafana_data: # For Grafana data
+

@@ -1,0 +1,17 @@
+# grafana/provisioning/datasources/datasource.yml
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus-datasource
+    access: proxy
+    url: http://prometheus:9090 # 'prometheus' is the service name in docker-compose
+    isDefault: true
+    version: 1
+    editable: true
+    # Configure dashboard provisioning to use this datasource
+    # This is not directly part of datasource, but related to how Grafana uses it.
+    # The dashboard provisioning will reference this datasource.
+
